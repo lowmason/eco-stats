@@ -20,7 +20,13 @@ cd eco-stats
 pip install -e .
 ```
 
-### With pandas support (optional)
+### With polars support (optional)
+
+```bash
+pip install -e .[polars]
+```
+
+### With pandas support (optional, legacy)
 
 ```bash
 pip install -e .[pandas]
@@ -226,7 +232,7 @@ is_valid = validate_date('2024-01-01')  # Returns True
 fred_response = fred.get_gdp()
 data = extract_series_data(fred_response, api_type='fred')
 
-# Convert to DataFrame (requires pandas)
+# Convert to DataFrame (requires polars)
 df = convert_to_dataframe(data)
 
 # Calculate percent change

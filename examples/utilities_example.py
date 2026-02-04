@@ -53,14 +53,14 @@ def main():
                 if len(data) > 0:
                     print(f'   First observation: {data[0]}')
                 
-                # Example 3: Convert to DataFrame (if pandas available)
+                # Example 3: Convert to DataFrame (if polars available)
                 print('\n3. Converting to DataFrame...')
                 try:
                     df = convert_to_dataframe(data)
                     print(f'   DataFrame shape: {df.shape}')
                     print(f'   DataFrame columns: {list(df.columns)}')
                 except ImportError:
-                    print('   Pandas not installed, returning raw data')
+                    print('   Polars not installed, returning raw data')
                 
                 # Example 4: Cache response
                 print('\n4. Caching API response...')

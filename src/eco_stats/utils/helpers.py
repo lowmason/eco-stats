@@ -64,20 +64,20 @@ def parse_response(
 
 def convert_to_dataframe(data: List[Dict[str, Any]]) -> Any:
     '''
-    Convert list of dictionaries to a pandas DataFrame.
+    Convert list of dictionaries to a polars DataFrame.
 
     Args:
         data: List of dictionaries containing data
 
     Returns:
-        Pandas DataFrame if pandas is installed, otherwise returns original data
+        Polars DataFrame if polars is installed, otherwise returns original data
     '''
     try:
-        import pandas as pd
+        import polars as pl
 
-        return pd.DataFrame(data)
+        return pl.DataFrame(data)
     except ImportError:
-        # If pandas is not installed, return the raw data
+        # If polars is not installed, return the raw data
         return data
 
 
