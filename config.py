@@ -26,9 +26,16 @@ class Config:
         self.CARBON_API_KEY = os.getenv('CARBON_API_KEY')
         self.ECO_DATA_API_KEY = os.getenv('ECO_DATA_API_KEY')
         
-        # Optional configuration
-        self.API_TIMEOUT = int(os.getenv('API_TIMEOUT', '30'))
-        self.API_MAX_RETRIES = int(os.getenv('API_MAX_RETRIES', '3'))
+        # Optional configuration with error handling
+        try:
+            self.API_TIMEOUT = int(os.getenv('API_TIMEOUT', '30'))
+        except ValueError:
+            raise ValueError("API_TIMEOUT must be a valid integer")
+        
+        try:
+            self.API_MAX_RETRIES = int(os.getenv('API_MAX_RETRIES', '3'))
+        except ValueError:
+            raise ValueError("API_MAX_RETRIES must be a valid integer")
     
     def validate(self):
         """

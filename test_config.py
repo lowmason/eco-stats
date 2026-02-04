@@ -76,6 +76,7 @@ class TestConfig(unittest.TestCase):
             config.get_api_config('invalid_api')
         self.assertIn('Unknown API name', str(context.exception))
     
+    @patch.dict(os.environ, {}, clear=True)
     def test_default_values(self):
         """Test that default values are used when env vars are not set."""
         config = Config()
@@ -84,6 +85,20 @@ class TestConfig(unittest.TestCase):
         self.assertIsNotNone(config.WEATHER_API_ENDPOINT)
         self.assertIsNotNone(config.CARBON_API_ENDPOINT)
         self.assertIsNotNone(config.ECO_DATA_API_ENDPOINT)
+    
+    @patch.dict(os.environ, {'API_TIMEOUT': 'not_a_number'}, clear=True)
+    def test_invalid_timeout_value(self):
+        """Test that invalid timeout value raises ValueError."""
+        with self.assertRaises(ValueError) as context:
+            Config()
+        self.assertIn('API_TIMEOUT must be a valid integer', str(context.exception))
+    
+    @patch.dict(os.environ, {'API_MAX_RETRIES': 'invalid'}, clear=True)
+    def test_invalid_max_retries_value(self):
+        """Test that invalid max retries value raises ValueError."""
+        with self.assertRaises(ValueError) as context:
+            Config()
+        self.assertIn('API_MAX_RETRIES must be a valid integer', str(context.exception))
 
 
 if __name__ == '__main__':
