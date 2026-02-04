@@ -1,4 +1,4 @@
-"""
+'''
 Refactored client for the Bureau of Labor Statistics (BLS).
 
 Combines the existing BLS Public Data API access with:
@@ -11,7 +11,7 @@ Combines the existing BLS Public Data API access with:
 
 Backward compatible: the original ``get_series()``, convenience
 methods, and context-manager protocol are preserved unchanged.
-"""
+'''
 
 import requests
 from typing import Any, Dict, List, Optional
@@ -26,7 +26,7 @@ from eco_stats.api.bls.flat_files import BLSFlatFileClient
 
 
 class BLSClient:
-    """
+    '''
     Unified client for BLS data access.
 
     Provides three layers of access:
@@ -44,15 +44,15 @@ class BLSClient:
         api_key: BLS API registration key (optional but recommended).
             Register at https://data.bls.gov/registrationEngine/
         cache_dir: Local directory for cached flat files.
-    """
+    '''
 
-    BASE_URL_V2 = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
-    BASE_URL_V1 = "https://api.bls.gov/publicAPI/v1/timeseries/data/"
+    BASE_URL_V2 = 'https://api.bls.gov/publicAPI/v2/timeseries/data/'
+    BASE_URL_V1 = 'https://api.bls.gov/publicAPI/v1/timeseries/data/'
 
     def __init__(
         self,
         api_key: Optional[str] = None,
-        cache_dir: str = ".cache/bls",
+        cache_dir: str = '.cache/bls',
     ) -> None:
         self.api_key = api_key
         self.session = requests.Session()
@@ -73,7 +73,7 @@ class BLSClient:
         annual_average: bool = False,
         aspects: bool = False,
     ) -> Dict[str, Any]:
-        """
+        '''
         Get time series data via the BLS Public Data API.
 
         Args:
@@ -88,26 +88,26 @@ class BLSClient:
 
         Returns:
             Dictionary containing the requested time series data.
-        """
-        payload: Dict[str, Any] = {"seriesid": series_ids}
+        '''
+        payload: Dict[str, Any] = {'seriesid': series_ids}
 
         if self.api_key:
-            payload["registrationkey"] = self.api_key
+            payload['registrationkey'] = self.api_key
 
         if start_year:
-            payload["startyear"] = start_year
+            payload['startyear'] = start_year
         if end_year:
-            payload["endyear"] = end_year
+            payload['endyear'] = end_year
         if catalog:
-            payload["catalog"] = catalog
+            payload['catalog'] = catalog
         if calculations:
-            payload["calculations"] = calculations
+            payload['calculations'] = calculations
         if annual_average:
-            payload["annualaverage"] = annual_average
+            payload['annualaverage'] = annual_average
         if aspects:
-            payload["aspects"] = aspects
+            payload['aspects'] = aspects
 
-        headers = {"Content-Type": "application/json"}
+        headers = {'Content-Type': 'application/json'}
         response = self.session.post(
             self.base_url,
             json=payload,
@@ -125,7 +125,7 @@ class BLSClient:
         start_year: Optional[str] = None,
         end_year: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
+        '''
         Get the U.S. unemployment rate (seasonally adjusted).
 
         Uses series ``LNS14000000`` from the Labor Force Statistics
@@ -137,9 +137,9 @@ class BLSClient:
 
         Returns:
             Dictionary containing unemployment rate data.
-        """
+        '''
         return self.get_series(
-            series_ids=["LNS14000000"],
+            series_ids=['LNS14000000'],
             start_year=start_year,
             end_year=end_year,
         )
@@ -149,7 +149,7 @@ class BLSClient:
         start_year: Optional[str] = None,
         end_year: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
+        '''
         Get CPI for All Urban Consumers (CPI-U), All Items.
 
         Uses series ``CUUR0000SA0`` from the Consumer Price Index (CU)
@@ -161,9 +161,9 @@ class BLSClient:
 
         Returns:
             Dictionary containing CPI data.
-        """
+        '''
         return self.get_series(
-            series_ids=["CUUR0000SA0"],
+            series_ids=['CUUR0000SA0'],
             start_year=start_year,
             end_year=end_year,
         )
@@ -173,7 +173,7 @@ class BLSClient:
         start_year: Optional[str] = None,
         end_year: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
+        '''
         Get total nonfarm employment (seasonally adjusted).
 
         Uses series ``CES0000000001`` from the Current Employment
@@ -185,9 +185,9 @@ class BLSClient:
 
         Returns:
             Dictionary containing employment data.
-        """
+        '''
         return self.get_series(
-            series_ids=["CES0000000001"],
+            series_ids=['CES0000000001'],
             start_year=start_year,
             end_year=end_year,
         )
@@ -197,7 +197,7 @@ class BLSClient:
         start_year: Optional[str] = None,
         end_year: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
+        '''
         Get average hourly earnings of all employees (seasonally adjusted).
 
         Uses series ``CES0500000003`` from the Current Employment
@@ -209,9 +209,9 @@ class BLSClient:
 
         Returns:
             Dictionary containing earnings data.
-        """
+        '''
         return self.get_series(
-            series_ids=["CES0500000003"],
+            series_ids=['CES0500000003'],
             start_year=start_year,
             end_year=end_year,
         )
@@ -221,7 +221,7 @@ class BLSClient:
     # ------------------------------------------------------------------
 
     def list_programs(self) -> Dict[str, str]:
-        """
+        '''
         List all registered BLS programs.
 
         Returns:
@@ -234,11 +234,11 @@ class BLSClient:
              'BD': 'Business Employment Dynamics',
              'CE': 'Current Employment Statistics (National)',
              ...}
-        """
+        '''
         return list_programs()
 
     def get_program_info(self, prefix: str) -> BLSProgram:
-        """
+        '''
         Get detailed metadata for a BLS program.
 
         Args:
@@ -246,7 +246,7 @@ class BLSClient:
 
         Returns:
             :class:`BLSProgram` with fields, mapping files, etc.
-        """
+        '''
         return get_program(prefix)
 
     def get_mapping(
@@ -254,7 +254,7 @@ class BLSClient:
         program: str,
         mapping_name: str,
     ) -> List[Dict[str, str]]:
-        """
+        '''
         Download a mapping/lookup table for a program.
 
         For example, ``get_mapping("CU", "area")`` returns a list of
@@ -267,7 +267,7 @@ class BLSClient:
 
         Returns:
             List of dicts, one per row.
-        """
+        '''
         return self._flat.get_mapping(program, mapping_name)
 
     def search_series(
@@ -275,7 +275,7 @@ class BLSClient:
         program: str,
         **filters: str,
     ) -> List[Dict[str, str]]:
-        """
+        '''
         Search the master series list for a program.
 
         Filters are applied as exact matches on column values.
@@ -291,7 +291,7 @@ class BLSClient:
 
             >>> client.search_series("CE", seasonal="S",
             ...                      data_type_code="01")
-        """
+        '''
         return self._flat.get_series_list(program, **filters)
 
     # ------------------------------------------------------------------
@@ -299,7 +299,7 @@ class BLSClient:
     # ------------------------------------------------------------------
 
     def parse_series_id(self, series_id: str) -> Dict[str, str]:
-        """
+        '''
         Decompose a series ID into its named component fields.
 
         Args:
@@ -313,11 +313,11 @@ class BLSClient:
             >>> client.parse_series_id("CUUR0000SA0")
             {'program': 'CU', 'prefix': 'CU', 'seasonal': 'U',
              'periodicity': 'R', 'area': '0000', 'item': 'SA0'}
-        """
+        '''
         return parse_series_id(series_id)
 
     def build_series_id(self, program: str, **components: str) -> str:
-        """
+        '''
         Construct a series ID from named components.
 
         Components not provided are zero-filled to the correct width.
@@ -335,7 +335,7 @@ class BLSClient:
             ...     "CU", seasonal="U", periodicity="R",
             ...     area="0000", item="SA0")
             'CUUR0000SA0'
-        """
+        '''
         return build_series_id(program, **components)
 
     # ------------------------------------------------------------------
@@ -345,9 +345,9 @@ class BLSClient:
     def get_bulk_data(
         self,
         program: str,
-        file_suffix: str = "0.Current",
+        file_suffix: str = '0.Current',
     ) -> List[Dict[str, str]]:
-        """
+        '''
         Download a complete data file from BLS flat files.
 
         These files contain full historical data with no API rate
@@ -362,7 +362,7 @@ class BLSClient:
         Returns:
             List of observation dicts with keys ``series_id``,
             ``year``, ``period``, ``value``, ``footnote_codes``.
-        """
+        '''
         return self._flat.get_data(program, file_suffix)
 
     # ------------------------------------------------------------------
@@ -370,12 +370,12 @@ class BLSClient:
     # ------------------------------------------------------------------
 
     def close(self) -> None:
-        """Close HTTP sessions."""
+        '''Close HTTP sessions.'''
         self.session.close()
         self._flat.close()
 
-    def __enter__(self) -> "BLSClient":
-        """Context manager entry."""
+    def __enter__(self) -> 'BLSClient':
+        '''Context manager entry.'''
         return self
 
     def __exit__(
@@ -384,5 +384,5 @@ class BLSClient:
         exc_val: Any,
         exc_tb: Any,
     ) -> None:
-        """Context manager exit."""
+        '''Context manager exit.'''
         self.close()

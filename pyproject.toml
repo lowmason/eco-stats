@@ -32,12 +32,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-pandas = ["pandas>=1.3.0"]
+polars = ["polars>=0.20.0"]
+pandas = ["pandas>=1.3.0"]  # Legacy support, prefer polars
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=3.0.0",
-    "black>=22.0.0",
-    "flake8>=4.0.0",
+    "ruff>=0.8.0",
 ]
 
 [project.scripts]
@@ -50,18 +50,20 @@ Repository = "https://github.com/lowmason/eco-stats"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.black]
+[tool.ruff]
 line-length = 88
-target-version = ["py38", "py39", "py310", "py311", "py312"]
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-    \.git
-    | \.venv
-    | build
-    | dist
-)/
-'''
+target-version = "py38"
+
+[tool.ruff.lint]
+# Enable pycodestyle (E), Pyflakes (F), and isort (I) rules
+select = ["E", "F", "I"]
+ignore = []
+
+[tool.ruff.format]
+# Use single quotes for strings
+quote-style = "single"
+# Indent with spaces
+indent-style = "space"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

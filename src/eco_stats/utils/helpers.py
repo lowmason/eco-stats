@@ -1,9 +1,9 @@
-"""
+'''
 Utility functions for eco-stats.
 
 This module provides helper functions for date validation, data formatting,
 response parsing, and other common operations.
-"""
+'''
 
 from datetime import datetime
 from typing import Dict, List, Any, Optional
@@ -12,8 +12,8 @@ import hashlib
 import os
 
 
-def validate_date(date_string: str, date_format: str = "%Y-%m-%d") -> bool:
-    """
+def validate_date(date_string: str, date_format: str = '%Y-%m-%d') -> bool:
+    '''
     Validate if a string is a valid date.
 
     Args:
@@ -22,7 +22,7 @@ def validate_date(date_string: str, date_format: str = "%Y-%m-%d") -> bool:
 
     Returns:
         True if valid, False otherwise
-    """
+    '''
     try:
         datetime.strptime(date_string, date_format)
         return True
@@ -30,8 +30,8 @@ def validate_date(date_string: str, date_format: str = "%Y-%m-%d") -> bool:
         return False
 
 
-def format_date(date_obj: datetime, date_format: str = "%Y-%m-%d") -> str:
-    """
+def format_date(date_obj: datetime, date_format: str = '%Y-%m-%d') -> str:
+    '''
     Format a datetime object to a string.
 
     Args:
@@ -40,14 +40,14 @@ def format_date(date_obj: datetime, date_format: str = "%Y-%m-%d") -> str:
 
     Returns:
         Formatted date string
-    """
+    '''
     return date_obj.strftime(date_format)
 
 
 def parse_response(
     response_data: Dict[str, Any], data_key: Optional[str] = None
 ) -> Any:
-    """
+    '''
     Parse API response and extract data.
 
     Args:
@@ -56,14 +56,14 @@ def parse_response(
 
     Returns:
         Parsed data from response
-    """
+    '''
     if data_key and data_key in response_data:
         return response_data[data_key]
     return response_data
 
 
 def convert_to_dataframe(data: List[Dict[str, Any]]) -> Any:
-    """
+    '''
     Convert list of dictionaries to a pandas DataFrame.
 
     Args:
@@ -71,7 +71,7 @@ def convert_to_dataframe(data: List[Dict[str, Any]]) -> Any:
 
     Returns:
         Pandas DataFrame if pandas is installed, otherwise returns original data
-    """
+    '''
     try:
         import pandas as pd
 
@@ -82,9 +82,9 @@ def convert_to_dataframe(data: List[Dict[str, Any]]) -> Any:
 
 
 def extract_series_data(
-    response: Dict[str, Any], api_type: str = "fred"
+    response: Dict[str, Any], api_type: str = 'fred'
 ) -> List[Dict[str, Any]]:
-    """
+    '''
     Extract time series data from API responses.
 
     Args:
@@ -93,44 +93,44 @@ def extract_series_data(
 
     Returns:
         List of dictionaries with standardized format
-    """
+    '''
     data = []
 
-    if api_type == "fred":
-        if "observations" in response:
-            for obs in response["observations"]:
+    if api_type == 'fred':
+        if 'observations' in response:
+            for obs in response['observations']:
                 data.append(
                     {
-                        "date": obs.get("date"),
-                        "value": obs.get("value"),
-                        "realtime_start": obs.get("realtime_start"),
-                        "realtime_end": obs.get("realtime_end"),
+                        'date': obs.get('date'),
+                        'value': obs.get('value'),
+                        'realtime_start': obs.get('realtime_start'),
+                        'realtime_end': obs.get('realtime_end'),
                     }
                 )
 
-    elif api_type == "bls":
-        if "Results" in response and "series" in response["Results"]:
-            for series in response["Results"]["series"]:
-                series_id = series.get("seriesID")
-                for obs in series.get("data", []):
+    elif api_type == 'bls':
+        if 'Results' in response and 'series' in response['Results']:
+            for series in response['Results']['series']:
+                series_id = series.get('seriesID')
+                for obs in series.get('data', []):
                     data.append(
                         {
-                            "series_id": series_id,
-                            "year": obs.get("year"),
-                            "period": obs.get("period"),
-                            "value": obs.get("value"),
-                            "period_name": obs.get("periodName"),
+                            'series_id': series_id,
+                            'year': obs.get('year'),
+                            'period': obs.get('period'),
+                            'value': obs.get('value'),
+                            'period_name': obs.get('periodName'),
                         }
                     )
 
-    elif api_type == "bea":
-        if "BEAAPI" in response and "Results" in response["BEAAPI"]:
-            results = response["BEAAPI"]["Results"]
-            if "Data" in results:
-                for item in results["Data"]:
+    elif api_type == 'bea':
+        if 'BEAAPI' in response and 'Results' in response['BEAAPI']:
+            results = response['BEAAPI']['Results']
+            if 'Data' in results:
+                for item in results['Data']:
                     data.append(item)
 
-    elif api_type == "census":
+    elif api_type == 'census':
         # Census data is typically returned as a list of lists
         if isinstance(response, list) and len(response) > 0:
             headers = response[0]
@@ -143,10 +143,10 @@ def extract_series_data(
 
 def cache_response(
     response_data: Dict[str, Any],
-    cache_dir: str = ".cache",
+    cache_dir: str = '.cache',
     cache_key: Optional[str] = None,
 ) -> str:
-    """
+    '''
     Cache API response to disk.
 
     Args:
@@ -156,7 +156,7 @@ def cache_response(
 
     Returns:
         Path to the cached file
-    """
+    '''
     # Create cache directory if it doesn't exist
     os.makedirs(cache_dir, exist_ok=True)
 
@@ -166,17 +166,17 @@ def cache_response(
         cache_key = hashlib.md5(data_str.encode()).hexdigest()
 
     # Save to cache
-    cache_path = os.path.join(cache_dir, f"{cache_key}.json")
-    with open(cache_path, "w") as f:
+    cache_path = os.path.join(cache_dir, f'{cache_key}.json')
+    with open(cache_path, 'w') as f:
         json.dump(response_data, f, indent=2)
 
     return cache_path
 
 
 def load_cached_response(
-    cache_key: str, cache_dir: str = ".cache"
+    cache_key: str, cache_dir: str = '.cache'
 ) -> Optional[Dict[str, Any]]:
-    """
+    '''
     Load cached API response from disk.
 
     Args:
@@ -185,11 +185,11 @@ def load_cached_response(
 
     Returns:
         Cached response data if found, None otherwise
-    """
-    cache_path = os.path.join(cache_dir, f"{cache_key}.json")
+    '''
+    cache_path = os.path.join(cache_dir, f'{cache_key}.json')
 
     if os.path.exists(cache_path):
-        with open(cache_path, "r") as f:
+        with open(cache_path, 'r') as f:
             return json.load(f)
 
     return None
@@ -198,7 +198,7 @@ def load_cached_response(
 def calculate_percent_change(
     values: List[float], periods: int = 1
 ) -> List[Optional[float]]:
-    """
+    '''
     Calculate percent change for a series of values.
 
     Args:
@@ -207,7 +207,7 @@ def calculate_percent_change(
 
     Returns:
         List of percent changes (None for first 'periods' values)
-    """
+    '''
     result = [None] * periods
 
     for i in range(periods, len(values)):
@@ -223,7 +223,7 @@ def calculate_percent_change(
 def calculate_moving_average(
     values: List[float], window: int = 3
 ) -> List[Optional[float]]:
-    """
+    '''
     Calculate moving average for a series of values.
 
     Args:
@@ -232,7 +232,7 @@ def calculate_moving_average(
 
     Returns:
         List of moving averages (None for first 'window-1' values)
-    """
+    '''
     result = [None] * (window - 1)
 
     for i in range(window - 1, len(values)):
@@ -247,9 +247,9 @@ def calculate_moving_average(
 
 
 def filter_by_date_range(
-    data: List[Dict[str, Any]], start_date: str, end_date: str, date_field: str = "date"
+    data: List[Dict[str, Any]], start_date: str, end_date: str, date_field: str = 'date'
 ) -> List[Dict[str, Any]]:
-    """
+    '''
     Filter data by date range.
 
     Args:
@@ -260,7 +260,7 @@ def filter_by_date_range(
 
     Returns:
         Filtered list of dictionaries
-    """
+    '''
     filtered = []
 
     for item in data:

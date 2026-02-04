@@ -1,1 +1,1 @@
-"""Tests for eco-stats package."""
+'''Tests for eco-stats package.'''

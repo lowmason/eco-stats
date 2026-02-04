@@ -8,8 +8,8 @@ eco-stats is a Python library for pulling statistical series from U.S. governmen
 
 - Python 3.8+
 - `requests` for HTTP, `python-dotenv` for env config
-- Optional: `pandas` for dataframe support
-- Dev tools: `pytest`, `black`, `flake8`
+- Optional: `polars` for dataframe support (preferred over pandas)
+- Dev tools: `pytest`, `ruff`
 
 ## Project Structure
 
@@ -29,17 +29,20 @@ examples/               # Example scripts for each API + unified usage
 ```bash
 # Install
 pip install -e .            # Base install
-pip install -e .[dev]       # With dev tools (pytest, black, flake8)
-pip install -e .[pandas]    # With pandas support
+pip install -e .[dev]       # With dev tools (pytest, ruff)
+pip install -e .[polars]    # With polars support (preferred)
 
 # Test
 pytest tests/
 pytest tests/test_basic.py -v
 pytest --cov=eco_stats tests/
 
-# Lint & Format
-black src/
-flake8 src/
+# Lint & Check
+ruff check src/             # Lint code
+ruff format --check src/    # Check formatting (without modifying)
+
+# Format (manual only, not on commit)
+ruff format src/            # Format code
 
 # Run CLI
 python -m eco_stats
@@ -54,12 +57,15 @@ Never commit `.env` files — they are in `.gitignore`.
 
 ## Code Conventions
 
-- PEP 8 with `black` formatting
+- PEP 8 with `ruff` formatting
+- **Single quotes for strings** — always use `'single'` instead of `"double"` quotes for string literals
 - Type hints throughout (`Optional[str]`, etc.)
-- Docstrings on all public classes and functions
+- Docstrings on all public classes and functions (triple single quotes: `'''docstring'''`)
 - snake_case for functions/variables, PascalCase for classes, UPPER_CASE for constants
 - Each API client uses `requests.Session()` with context manager support (`__enter__`/`__exit__`)
 - Private methods prefixed with `_` (e.g., `_make_request`)
+- Code is linted/formatted manually, not automatically on commit
+- **Polars over pandas** — when adding dataframe support, use polars (faster, more memory-efficient)
 
 ## Architecture Notes
 

@@ -1,31 +1,31 @@
-"""
+'''
 Client for interacting with the U.S. Census Bureau API.
 
 The Census API provides access to demographic, economic, and geographic data.
 More info: https://www.census.gov/data/developers.html
-"""
+'''
 
 import requests
 from typing import Dict, List, Optional, Any
 
 
 class CensusClient:
-    """
+    '''
     Client for accessing U.S. Census Bureau data.
 
     The Census API provides access to demographic data, economic data,
     American Community Survey (ACS), and many other datasets.
-    """
+    '''
 
-    BASE_URL = "https://api.census.gov/data"
+    BASE_URL = 'https://api.census.gov/data'
 
     def __init__(self, api_key: str):
-        """
+        '''
         Initialize the Census client.
 
         Args:
             api_key: Your Census API key. Register at https://api.census.gov/data/key_signup.html
-        """
+        '''
         self.api_key = api_key
         self.session = requests.Session()
 
@@ -38,7 +38,7 @@ class CensusClient:
         year: Optional[str] = None,
         **kwargs,
     ) -> List[List[str]]:
-        """
+        '''
         Get data from the Census API.
 
         Args:
@@ -51,20 +51,20 @@ class CensusClient:
 
         Returns:
             List of lists containing the data (first row is headers)
-        """
+        '''
         # Build the URL
         if year:
-            url = f"{self.BASE_URL}/{year}/{dataset}"
+            url = f'{self.BASE_URL}/{year}/{dataset}'
         else:
-            url = f"{self.BASE_URL}/{dataset}"
+            url = f'{self.BASE_URL}/{dataset}'
 
         # Build parameters
-        params = {"get": ",".join(variables), "for": geo_level, "key": self.api_key}
+        params = {'get': ','.join(variables), 'for': geo_level, 'key': self.api_key}
 
         # Add geographic filters
         if geo_filter:
             for key, value in geo_filter.items():
-                params[f"in"] = f"{key}:{value}"
+                params[f'in'] = f'{key}:{value}'
 
         # Add additional parameters
         params.update(kwargs)
@@ -77,11 +77,11 @@ class CensusClient:
         self,
         variables: List[str],
         geo_level: str,
-        year: str = "2021",
-        survey: str = "acs5",
+        year: str = '2021',
+        survey: str = 'acs5',
         geo_filter: Optional[Dict[str, str]] = None,
     ) -> List[List[str]]:
-        """
+        '''
         Get American Community Survey (ACS) data.
 
         Args:
@@ -93,9 +93,9 @@ class CensusClient:
 
         Returns:
             List of lists containing the ACS data
-        """
+        '''
         return self.get_data(
-            dataset=f"acs/{survey}",
+            dataset=f'acs/{survey}',
             variables=variables,
             geo_level=geo_level,
             geo_filter=geo_filter,
@@ -104,11 +104,11 @@ class CensusClient:
 
     def get_population(
         self,
-        geo_level: str = "us:*",
-        year: str = "2021",
+        geo_level: str = 'us:*',
+        year: str = '2021',
         geo_filter: Optional[Dict[str, str]] = None,
     ) -> List[List[str]]:
-        """
+        '''
         Get population data from ACS.
 
         Args:
@@ -118,9 +118,9 @@ class CensusClient:
 
         Returns:
             List of lists containing population data
-        """
+        '''
         return self.get_acs_data(
-            variables=["NAME", "B01001_001E"],  # Total population
+            variables=['NAME', 'B01001_001E'],  # Total population
             geo_level=geo_level,
             year=year,
             geo_filter=geo_filter,
@@ -128,11 +128,11 @@ class CensusClient:
 
     def get_median_income(
         self,
-        geo_level: str = "us:*",
-        year: str = "2021",
+        geo_level: str = 'us:*',
+        year: str = '2021',
         geo_filter: Optional[Dict[str, str]] = None,
     ) -> List[List[str]]:
-        """
+        '''
         Get median household income from ACS.
 
         Args:
@@ -142,9 +142,9 @@ class CensusClient:
 
         Returns:
             List of lists containing median income data
-        """
+        '''
         return self.get_acs_data(
-            variables=["NAME", "B19013_001E"],  # Median household income
+            variables=['NAME', 'B19013_001E'],  # Median household income
             geo_level=geo_level,
             year=year,
             geo_filter=geo_filter,
@@ -152,11 +152,11 @@ class CensusClient:
 
     def get_poverty_rate(
         self,
-        geo_level: str = "us:*",
-        year: str = "2021",
+        geo_level: str = 'us:*',
+        year: str = '2021',
         geo_filter: Optional[Dict[str, str]] = None,
     ) -> List[List[str]]:
-        """
+        '''
         Get poverty rate from SAIPE (Small Area Income and Poverty Estimates).
 
         Args:
@@ -166,19 +166,19 @@ class CensusClient:
 
         Returns:
             List of lists containing poverty rate data
-        """
+        '''
         return self.get_data(
-            dataset="timeseries/poverty/saipe",
-            variables=["NAME", "SAEPOVRTALL_PT"],  # All ages poverty rate
+            dataset='timeseries/poverty/saipe',
+            variables=['NAME', 'SAEPOVRTALL_PT'],  # All ages poverty rate
             geo_level=geo_level,
             year=year,
             geo_filter=geo_filter,
         )
 
     def get_economic_indicators(
-        self, variables: List[str], geo_level: str = "us:*", year: Optional[str] = None
+        self, variables: List[str], geo_level: str = 'us:*', year: Optional[str] = None
     ) -> List[List[str]]:
-        """
+        '''
         Get economic indicators from the Economic Census or other economic datasets.
 
         Args:
@@ -188,22 +188,22 @@ class CensusClient:
 
         Returns:
             List of lists containing economic indicator data
-        """
+        '''
         return self.get_data(
-            dataset="cbp",  # County Business Patterns
+            dataset='cbp',  # County Business Patterns
             variables=variables,
             geo_level=geo_level,
             year=year,
         )
 
     def close(self):
-        """Close the session."""
+        '''Close the session.'''
         self.session.close()
 
     def __enter__(self):
-        """Context manager entry."""
+        '''Context manager entry.'''
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
+        '''Context manager exit.'''
         self.close()

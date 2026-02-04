@@ -1,9 +1,9 @@
-"""
+'''
 Client for interacting with the Bureau of Economic Analysis (BEA) API.
 
 The BEA API provides access to official U.S. macroeconomic statistics.
 More info: https://apps.bea.gov/api/
-"""
+'''
 
 import requests
 from typing import Dict, List, Optional, Any
@@ -11,28 +11,28 @@ import json
 
 
 class BEAClient:
-    """
+    '''
     Client for accessing BEA (Bureau of Economic Analysis) data.
 
     The BEA API provides access to official U.S. macroeconomic statistics
     including National Income and Product Accounts (NIPA), Regional Economic
     Accounts, and more.
-    """
+    '''
 
-    BASE_URL = "https://apps.bea.gov/api/data"
+    BASE_URL = 'https://apps.bea.gov/api/data'
 
     def __init__(self, api_key: str):
-        """
+        '''
         Initialize the BEA client.
 
         Args:
             api_key: Your BEA API key. Register at https://apps.bea.gov/api/signup/
-        """
+        '''
         self.api_key = api_key
         self.session = requests.Session()
 
     def get_parameter_list(self, dataset_name: str) -> Dict[str, Any]:
-        """
+        '''
         Get the list of parameters for a specific dataset.
 
         Args:
@@ -40,12 +40,12 @@ class BEAClient:
 
         Returns:
             Dictionary containing parameter information
-        """
+        '''
         params = {
-            "UserID": self.api_key,
-            "method": "GetParameterList",
-            "datasetname": dataset_name,
-            "ResultFormat": "JSON",
+            'UserID': self.api_key,
+            'method': 'GetParameterList',
+            'datasetname': dataset_name,
+            'ResultFormat': 'JSON',
         }
 
         response = self.session.get(self.BASE_URL, params=params)
@@ -60,7 +60,7 @@ class BEAClient:
         year: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
-        """
+        '''
         Get data from the BEA API.
 
         Args:
@@ -72,20 +72,20 @@ class BEAClient:
 
         Returns:
             Dictionary containing the requested data
-        """
+        '''
         params = {
-            "UserID": self.api_key,
-            "method": "GetData",
-            "datasetname": dataset_name,
-            "ResultFormat": "JSON",
+            'UserID': self.api_key,
+            'method': 'GetData',
+            'datasetname': dataset_name,
+            'ResultFormat': 'JSON',
         }
 
         if table_name:
-            params["TableName"] = table_name
+            params['TableName'] = table_name
         if frequency:
-            params["Frequency"] = frequency
+            params['Frequency'] = frequency
         if year:
-            params["Year"] = year
+            params['Year'] = year
 
         # Add any additional parameters
         params.update(kwargs)
@@ -95,9 +95,9 @@ class BEAClient:
         return response.json()
 
     def get_nipa_data(
-        self, table_name: str, frequency: str = "A", year: str = "X"
+        self, table_name: str, frequency: str = 'A', year: str = 'X'
     ) -> Dict[str, Any]:
-        """
+        '''
         Get National Income and Product Accounts (NIPA) data.
 
         Args:
@@ -107,15 +107,15 @@ class BEAClient:
 
         Returns:
             Dictionary containing NIPA data
-        """
+        '''
         return self.get_data(
-            dataset_name="NIPA", table_name=table_name, frequency=frequency, year=year
+            dataset_name='NIPA', table_name=table_name, frequency=frequency, year=year
         )
 
     def get_regional_data(
-        self, table_name: str, line_code: str, geo_fips: str, year: str = "LAST5"
+        self, table_name: str, line_code: str, geo_fips: str, year: str = 'LAST5'
     ) -> Dict[str, Any]:
-        """
+        '''
         Get Regional Economic Accounts data.
 
         Args:
@@ -126,9 +126,9 @@ class BEAClient:
 
         Returns:
             Dictionary containing regional data
-        """
+        '''
         return self.get_data(
-            dataset_name="Regional",
+            dataset_name='Regional',
             TableName=table_name,
             LineCode=line_code,
             GeoFips=geo_fips,
@@ -136,13 +136,13 @@ class BEAClient:
         )
 
     def close(self):
-        """Close the session."""
+        '''Close the session.'''
         self.session.close()
 
     def __enter__(self):
-        """Context manager entry."""
+        '''Context manager entry.'''
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
+        '''Context manager exit.'''
         self.close()

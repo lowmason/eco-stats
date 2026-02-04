@@ -1,4 +1,4 @@
-"""
+'''
 BLS series ID builder and parser.
 
 BLS series IDs are fixed-width strings whose character positions encode
@@ -10,7 +10,7 @@ This module provides two pure functions:
 
 * :func:`parse_series_id` — decompose an existing ID into named fields.
 * :func:`build_series_id` — construct an ID from named components.
-"""
+'''
 
 from typing import Dict
 
@@ -18,7 +18,7 @@ from eco_stats.api.bls.programs import get_program
 
 
 def parse_series_id(series_id: str) -> Dict[str, str]:
-    """
+    '''
     Decompose a BLS series ID into its component fields.
 
     The first two characters identify the program, which determines
@@ -46,21 +46,21 @@ def parse_series_id(series_id: str) -> Dict[str, str]:
         >>> parse_series_id("CES0000000001")
         {'program': 'CE', 'prefix': 'CE', 'seasonal': 'S',
          'supersector': '00', 'industry': '000000', 'data_type': '01'}
-    """
+    '''
     if len(series_id) < 2:
-        raise ValueError(f"Series ID must be at least 2 characters, got {series_id!r}")
+        raise ValueError(f'Series ID must be at least 2 characters, got {series_id!r}')
 
     prefix = series_id[:2].upper()
     program = get_program(prefix)
 
     if len(series_id) < program.series_id_length:
         raise ValueError(
-            f"Series ID {series_id!r} is too short for program {prefix}. "
-            f"Expected at least {program.series_id_length} characters, "
-            f"got {len(series_id)}."
+            f'Series ID {series_id!r} is too short for program {prefix}. '
+            f'Expected at least {program.series_id_length} characters, '
+            f'got {len(series_id)}.'
         )
 
-    result: Dict[str, str] = {"program": prefix}
+    result: Dict[str, str] = {'program': prefix}
     for field in program.fields:
         result[field.name] = field.extract(series_id)
 
@@ -68,7 +68,7 @@ def parse_series_id(series_id: str) -> Dict[str, str]:
 
 
 def build_series_id(program: str, **components: str) -> str:
-    """
+    '''
     Construct a BLS series ID from named components.
 
     Components that are not provided will be filled with ``"0"`` padding
@@ -98,15 +98,15 @@ def build_series_id(program: str, **components: str) -> str:
         >>> build_series_id("CE", seasonal="S", supersector="00",
         ...                 industry="000000", data_type="01")
         'CES0000000001'
-    """
+    '''
     prog = get_program(program)
 
     # Start with a mutable list of characters, zero-filled.
     length = prog.series_id_length
-    chars = ["0"] * length
+    chars = ['0'] * length
 
     # Always set the prefix.
-    components["prefix"] = prog.prefix
+    components['prefix'] = prog.prefix
 
     for field in prog.fields:
         value = components.get(field.name, None)
@@ -115,8 +115,8 @@ def build_series_id(program: str, **components: str) -> str:
             # BLS uses left-aligned text and zero-padded numerics, but
             # we keep it simple — just place the value left-aligned
             # and truncate / pad to fit.
-            padded = value.ljust(field.length, "0")[: field.length]
+            padded = value.ljust(field.length, '0')[: field.length]
             for i, ch in enumerate(padded):
                 chars[field.start - 1 + i] = ch
 
-    return "".join(chars)
+    return ''.join(chars)
