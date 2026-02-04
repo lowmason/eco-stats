@@ -8,6 +8,11 @@ from eco_stats.utils.helpers import (
     parse_response,
     convert_to_dataframe,
     cache_response,
+    load_cached_response,
+    calculate_percent_change,
+    calculate_moving_average,
+    extract_series_data,
+    filter_by_date_range,
 )
 
 __all__ = [
@@ -16,4 +21,9 @@ __all__ = [
     "parse_response",
     "convert_to_dataframe",
     "cache_response",
+    "load_cached_response",
+    "calculate_percent_change",
+    "calculate_moving_average",
+    "extract_series_data",
+    "filter_by_date_range",
 ]
