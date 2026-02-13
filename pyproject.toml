@@ -29,8 +29,10 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
+    "polars>=1.8.2",
     "python-dotenv==1.0.0",
     "requests>=2.31.0",
+    "urllib3>=1.26.0,<2.0.0", # Pin to v1.x for LibreSSL compatibility
 ]
 
 [project.optional-dependencies]

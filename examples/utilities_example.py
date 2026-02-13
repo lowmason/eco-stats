@@ -7,7 +7,11 @@ by eco-stats for data processing and manipulation.
 
 import os
 from datetime import datetime
+from dotenv import load_dotenv
 from eco_stats import FREDClient
+
+# Load environment variables from .env file
+load_dotenv()
 from eco_stats.utils import (
     validate_date,
     format_date,

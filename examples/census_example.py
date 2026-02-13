@@ -6,7 +6,11 @@ from the U.S. Census Bureau.
 '''
 
 import os
+from dotenv import load_dotenv
 from eco_stats import CensusClient
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 def main():

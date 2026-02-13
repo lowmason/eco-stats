@@ -6,7 +6,11 @@ from the Federal Reserve Economic Data (FRED) system.
 '''
 
 import os
+from dotenv import load_dotenv
 from eco_stats import FREDClient
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 def main():

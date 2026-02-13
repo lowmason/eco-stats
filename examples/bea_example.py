@@ -6,7 +6,11 @@ from the Bureau of Economic Analysis.
 '''
 
 import os
+from dotenv import load_dotenv
 from eco_stats import BEAClient
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 def main():

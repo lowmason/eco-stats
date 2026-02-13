@@ -6,7 +6,11 @@ all API clients through a single EcoStats object.
 '''
 
 import os
+from dotenv import load_dotenv
 from eco_stats import EcoStats
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 def main():

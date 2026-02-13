@@ -1,44 +1,87 @@
 '''
-Refactored client for the Bureau of Labor Statistics (BLS).
+Client for the Bureau of Labor Statistics (BLS).
 
-Combines the existing BLS Public Data API access with:
+All data methods return :class:`polars.DataFrame` objects with typed
+columns.  Where applicable a ``date`` column is derived from the BLS
+``year`` and ``period`` fields.
 
-* **Program registry** — structured metadata for every BLS survey.
-* **Series ID builder/parser** — construct and decompose series IDs
-  from named components instead of opaque strings.
-* **Flat file access** — download complete LABSTAT datasets from
-  ``download.bls.gov`` with no rate limits.
+Three layers of access:
 
-Backward compatible: the original ``get_series()``, convenience
-methods, and context-manager protocol are preserved unchanged.
+1. **JSON API** — ``get_series()`` and convenience methods hit the
+   BLS Public Data API (v1 without key, v2 with key).
+2. **Discovery** — ``list_programs()``, ``get_mapping()``,
+   ``search_series()`` expose the LABSTAT metadata.
+3. **Flat files** — ``get_bulk_data()`` downloads complete
+   tab-delimited datasets with no rate limits.
 '''
 
-import requests
+from datetime import date
 from typing import Any, Dict, List, Optional
 
+import polars as pl
+import requests
+
+from eco_stats.api.bls.flat_files import BLSFlatFileClient
 from eco_stats.api.bls.programs import (
     BLSProgram,
     get_program,
     list_programs,
 )
 from eco_stats.api.bls.series_id import build_series_id, parse_series_id
-from eco_stats.api.bls.flat_files import BLSFlatFileClient
+
+# Programs whose survey reference period is the pay period including
+# the 12th of the month.  Dates for these programs use day=12;
+# all others default to day=1.
+_REFERENCE_DAY_12_PROGRAMS = frozenset({'CE', 'EN'})
+
+
+def _reference_day(program_prefix: str) -> int:
+    '''Return the reference day-of-month for a BLS program prefix.'''
+    return 12 if program_prefix.upper() in _REFERENCE_DAY_12_PROGRAMS else 1
+
+
+def _period_to_month(period: str) -> Optional[int]:
+    '''
+    Convert a BLS period code to a month number.
+
+    Monthly periods ``M01``–``M12`` map to months 1–12.
+    ``M13`` (annual average) returns ``None``.  Quarterly
+    ``Q01``–``Q04`` map to the first month of the quarter.
+    Semi-annual ``S01``–``S02`` map to months 1 and 7.
+    Annual ``A01`` maps to month 1.
+
+    Args:
+        period: BLS period string (e.g., ``'M01'``, ``'Q03'``).
+
+    Returns:
+        Month number (1–12) or ``None`` if not mappable.
+    '''
+    if not period or len(period) < 2:
+        return None
+    code = period[0].upper()
+    try:
+        num = int(period[1:])
+    except (ValueError, TypeError):
+        return None
+
+    if code == 'M' and 1 <= num <= 12:
+        return num
+    if code == 'Q' and 1 <= num <= 4:
+        return (num - 1) * 3 + 1
+    if code == 'S' and 1 <= num <= 2:
+        return (num - 1) * 6 + 1
+    if code == 'A':
+        return 1
+    return None
 
 
 class BLSClient:
     '''
     Unified client for BLS data access.
 
-    Provides three layers of access:
-
-    1. **JSON API** — ``get_series()`` and convenience methods hit the
-       BLS Public Data API (v1 without key, v2 with key).  Rate-limited
-       but returns JSON directly.
-    2. **Discovery** — ``list_programs()``, ``get_mapping()``,
-       ``search_series()`` expose the LABSTAT metadata so users can
-       explore what's available.
-    3. **Flat files** — ``get_bulk_data()`` downloads complete
-       tab-delimited datasets with no rate limits.
+    All data methods return :class:`polars.DataFrame` objects with
+    typed columns.  Time-series results include a ``date`` column
+    derived from the BLS ``year`` and ``period`` fields.
 
     Args:
         api_key: BLS API registration key (optional but recommended).
@@ -60,7 +103,118 @@ class BLSClient:
         self._flat = BLSFlatFileClient(cache_dir=cache_dir)
 
     # ------------------------------------------------------------------
-    # JSON API access (existing interface, preserved)
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _parse_api_response(raw: Dict[str, Any]) -> pl.DataFrame:
+        '''
+        Parse a BLS JSON API response into a Polars DataFrame.
+
+        Extracts rows from ``Results.series[*].data[*]``, adds a
+        ``series_id`` column, constructs a ``date`` from year/period,
+        and casts ``value`` to Float64.
+
+        Args:
+            raw: The full JSON dict returned by the BLS API.
+
+        Returns:
+            A :class:`polars.DataFrame` with columns ``series_id``,
+            ``date``, ``year``, ``period``, ``period_name``, ``value``.
+
+        Raises:
+            ValueError: If the API response indicates failure.
+        '''
+        schema = {
+            'series_id': pl.Utf8,
+            'date': pl.Date,
+            'year': pl.Int64,
+            'period': pl.Utf8,
+            'period_name': pl.Utf8,
+            'value': pl.Float64,
+        }
+
+        status = raw.get('status', '')
+        if status != 'REQUEST_SUCCEEDED':
+            message = raw.get('message', [])
+            raise ValueError(f'BLS API request failed (status={status!r}): {message}')
+
+        rows: List[Dict[str, Any]] = []
+        for series in raw.get('Results', {}).get('series', []):
+            sid = series.get('seriesID', '')
+            day = _reference_day(sid[:2]) if len(sid) >= 2 else 1
+            for obs in series.get('data', []):
+                year_str = obs.get('year', '')
+                period = obs.get('period', '')
+
+                try:
+                    year_int = int(year_str)
+                except (ValueError, TypeError):
+                    year_int = None
+
+                month = _period_to_month(period)
+                obs_date = (
+                    date(year_int, month, day)
+                    if year_int is not None and month is not None
+                    else None
+                )
+
+                try:
+                    value = float(obs.get('value', ''))
+                except (ValueError, TypeError):
+                    value = None
+
+                rows.append(
+                    {
+                        'series_id': sid,
+                        'date': obs_date,
+                        'year': year_int,
+                        'period': period,
+                        'period_name': obs.get('periodName', ''),
+                        'value': value,
+                    }
+                )
+
+        return pl.DataFrame(rows, schema=schema).sort('date')
+
+    @staticmethod
+    def _add_date_column(df: pl.DataFrame, day: int = 1) -> pl.DataFrame:
+        '''
+        Derive a ``date`` column from ``year`` and ``period`` columns.
+
+        Uses native Polars expressions so the operation is vectorised
+        and efficient on large flat-file datasets.
+
+        Args:
+            df: DataFrame with ``year`` (Int64) and ``period`` (Utf8)
+                columns.
+            day: Day-of-month to use in the constructed date.
+                CES and QCEW use 12 (the survey reference date);
+                most other programs use 1.
+
+        Returns:
+            The input DataFrame with an added ``date`` column of type
+            :class:`polars.Date`.
+        '''
+        period_code = pl.col('period').str.slice(0, 1)
+        period_num = pl.col('period').str.slice(1).cast(pl.Int64, strict=False)
+
+        month = (
+            pl.when((period_code == 'M') & period_num.is_between(1, 12))
+            .then(period_num)
+            .when((period_code == 'Q') & period_num.is_between(1, 4))
+            .then((period_num - 1) * 3 + 1)
+            .when((period_code == 'S') & period_num.is_between(1, 2))
+            .then((period_num - 1) * 6 + 1)
+            .when(period_code == 'A')
+            .then(1)
+            .otherwise(None)
+        )
+
+        return df.with_columns(pl.date(pl.col('year'), month, day).alias('date'))
+
+    # ------------------------------------------------------------------
+    # JSON API access
     # ------------------------------------------------------------------
 
     def get_series(
@@ -72,7 +226,7 @@ class BLSClient:
         calculations: bool = False,
         annual_average: bool = False,
         aspects: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> pl.DataFrame:
         '''
         Get time series data via the BLS Public Data API.
 
@@ -87,7 +241,8 @@ class BLSClient:
             aspects: Include aspects (if available).
 
         Returns:
-            Dictionary containing the requested time series data.
+            :class:`polars.DataFrame` with columns ``series_id``,
+            ``date``, ``year``, ``period``, ``period_name``, ``value``.
         '''
         payload: Dict[str, Any] = {'seriesid': series_ids}
 
@@ -114,17 +269,17 @@ class BLSClient:
             headers=headers,
         )
         response.raise_for_status()
-        return response.json()
+        return self._parse_api_response(response.json())
 
     # ------------------------------------------------------------------
-    # Convenience methods (existing interface, preserved)
+    # Convenience methods
     # ------------------------------------------------------------------
 
     def get_unemployment_rate(
         self,
         start_year: Optional[str] = None,
         end_year: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> pl.DataFrame:
         '''
         Get the U.S. unemployment rate (seasonally adjusted).
 
@@ -136,7 +291,8 @@ class BLSClient:
             end_year: End year (format: ``'YYYY'``).
 
         Returns:
-            Dictionary containing unemployment rate data.
+            :class:`polars.DataFrame` with columns ``series_id``,
+            ``date``, ``year``, ``period``, ``period_name``, ``value``.
         '''
         return self.get_series(
             series_ids=['LNS14000000'],
@@ -148,7 +304,7 @@ class BLSClient:
         self,
         start_year: Optional[str] = None,
         end_year: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> pl.DataFrame:
         '''
         Get CPI for All Urban Consumers (CPI-U), All Items.
 
@@ -160,7 +316,8 @@ class BLSClient:
             end_year: End year (format: ``'YYYY'``).
 
         Returns:
-            Dictionary containing CPI data.
+            :class:`polars.DataFrame` with columns ``series_id``,
+            ``date``, ``year``, ``period``, ``period_name``, ``value``.
         '''
         return self.get_series(
             series_ids=['CUUR0000SA0'],
@@ -172,7 +329,7 @@ class BLSClient:
         self,
         start_year: Optional[str] = None,
         end_year: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> pl.DataFrame:
         '''
         Get total nonfarm employment (seasonally adjusted).
 
@@ -184,7 +341,8 @@ class BLSClient:
             end_year: End year (format: ``'YYYY'``).
 
         Returns:
-            Dictionary containing employment data.
+            :class:`polars.DataFrame` with columns ``series_id``,
+            ``date``, ``year``, ``period``, ``period_name``, ``value``.
         '''
         return self.get_series(
             series_ids=['CES0000000001'],
@@ -196,7 +354,7 @@ class BLSClient:
         self,
         start_year: Optional[str] = None,
         end_year: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> pl.DataFrame:
         '''
         Get average hourly earnings of all employees (seasonally adjusted).
 
@@ -208,7 +366,8 @@ class BLSClient:
             end_year: End year (format: ``'YYYY'``).
 
         Returns:
-            Dictionary containing earnings data.
+            :class:`polars.DataFrame` with columns ``series_id``,
+            ``date``, ``year``, ``period``, ``period_name``, ``value``.
         '''
         return self.get_series(
             series_ids=['CES0500000003'],
@@ -217,7 +376,7 @@ class BLSClient:
         )
 
     # ------------------------------------------------------------------
-    # Discovery (new)
+    # Discovery
     # ------------------------------------------------------------------
 
     def list_programs(self) -> Dict[str, str]:
@@ -253,12 +412,12 @@ class BLSClient:
         self,
         program: str,
         mapping_name: str,
-    ) -> List[Dict[str, str]]:
+    ) -> pl.DataFrame:
         '''
         Download a mapping/lookup table for a program.
 
-        For example, ``get_mapping("CU", "area")`` returns a list of
-        all CPI area codes and their names.
+        For example, ``get_mapping("CU", "area")`` returns a DataFrame
+        of all CPI area codes and their names.
 
         Args:
             program: Two-letter program prefix.
@@ -266,15 +425,18 @@ class BLSClient:
                 ``"industry"``, ``"item"``).
 
         Returns:
-            List of dicts, one per row.
+            :class:`polars.DataFrame` with one row per entry.
         '''
-        return self._flat.get_mapping(program, mapping_name)
+        rows = self._flat.get_mapping(program, mapping_name)
+        if not rows:
+            return pl.DataFrame()
+        return pl.DataFrame(rows)
 
     def search_series(
         self,
         program: str,
         **filters: str,
-    ) -> List[Dict[str, str]]:
+    ) -> pl.DataFrame:
         '''
         Search the master series list for a program.
 
@@ -282,20 +444,23 @@ class BLSClient:
 
         Args:
             program: Two-letter program prefix.
-            **filters: Column name → value pairs for filtering.
+            **filters: Column name -> value pairs for filtering.
 
         Returns:
-            List of matching series metadata dicts.
+            :class:`polars.DataFrame` of matching series metadata.
 
         Example::
 
-            >>> client.search_series("CE", seasonal="S",
-            ...                      data_type_code="01")
+            >>> client.search_series('CE', seasonal='S',
+            ...                      data_type_code='01')
         '''
-        return self._flat.get_series_list(program, **filters)
+        rows = self._flat.get_series_list(program, **filters)
+        if not rows:
+            return pl.DataFrame()
+        return pl.DataFrame(rows)
 
     # ------------------------------------------------------------------
-    # Series ID helpers (new)
+    # Series ID helpers
     # ------------------------------------------------------------------
 
     def parse_series_id(self, series_id: str) -> Dict[str, str]:
@@ -310,7 +475,7 @@ class BLSClient:
 
         Example::
 
-            >>> client.parse_series_id("CUUR0000SA0")
+            >>> client.parse_series_id('CUUR0000SA0')
             {'program': 'CU', 'prefix': 'CU', 'seasonal': 'U',
              'periodicity': 'R', 'area': '0000', 'item': 'SA0'}
         '''
@@ -332,21 +497,21 @@ class BLSClient:
         Example::
 
             >>> client.build_series_id(
-            ...     "CU", seasonal="U", periodicity="R",
-            ...     area="0000", item="SA0")
+            ...     'CU', seasonal='U', periodicity='R',
+            ...     area='0000', item='SA0')
             'CUUR0000SA0'
         '''
         return build_series_id(program, **components)
 
     # ------------------------------------------------------------------
-    # Flat file / bulk data access (new)
+    # Flat file / bulk data access
     # ------------------------------------------------------------------
 
     def get_bulk_data(
         self,
         program: str,
         file_suffix: str = '0.Current',
-    ) -> List[Dict[str, str]]:
+    ) -> pl.DataFrame:
         '''
         Download a complete data file from BLS flat files.
 
@@ -360,10 +525,33 @@ class BLSClient:
                 ``"0.AllCESSeries"`` (for CE).
 
         Returns:
-            List of observation dicts with keys ``series_id``,
-            ``year``, ``period``, ``value``, ``footnote_codes``.
+            :class:`polars.DataFrame` with columns ``series_id``,
+            ``date``, ``year``, ``period``, ``value``,
+            ``footnote_codes``.
         '''
-        return self._flat.get_data(program, file_suffix)
+        rows = self._flat.get_data(program, file_suffix)
+        if not rows:
+            return pl.DataFrame()
+
+        df = pl.DataFrame(rows)
+
+        # Flat files return all strings — cast numeric columns.
+        if 'year' in df.columns:
+            df = df.with_columns(pl.col('year').cast(pl.Int64, strict=False))
+        if 'value' in df.columns:
+            df = df.with_columns(pl.col('value').cast(pl.Float64, strict=False))
+
+        # Derive date from year + period.
+        if 'year' in df.columns and 'period' in df.columns:
+            df = self._add_date_column(df, day=_reference_day(program))
+
+            # Reorder so date is near the front.
+            col_order = ['series_id', 'date', 'year', 'period', 'value']
+            extra = [c for c in df.columns if c not in col_order]
+            df = df.select([c for c in col_order if c in df.columns] + extra)
+            df = df.sort('series_id', 'date')
+
+        return df
 
     # ------------------------------------------------------------------
     # Lifecycle
