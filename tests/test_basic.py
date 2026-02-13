@@ -95,12 +95,55 @@ def test_bea_client_initialization():
 
 
 def test_census_client_initialization():
-    '''Test Census client requires API key.'''
+    '''Test Census client initialization with and without API key.'''
     from eco_stats import CensusClient
 
     client = CensusClient(api_key='test_key')
     assert client is not None
     assert client.api_key == 'test_key'
+
+    # Should also work without a key (some endpoints don't require one)
+    client_no_key = CensusClient()
+    assert client_no_key is not None
+    assert client_no_key.api_key is None
+
+
+def test_census_list_datasets():
+    '''Test that the Census dataset catalog is accessible.'''
+    from eco_stats import CensusClient
+
+    client = CensusClient()
+    datasets = client.list_datasets()
+
+    assert datasets is not None
+    assert len(datasets) > 0
+    assert 'key' in datasets.columns
+    assert 'name' in datasets.columns
+    assert 'description' in datasets.columns
+
+    # Spot-check a few expected datasets
+    keys = datasets.get_column('key').to_list()
+    assert 'acs5' in keys
+    assert 'bds' in keys
+    assert 'ecnbasic' in keys
+    assert 'qwi/sa' in keys
+    assert 'govs' in keys
+    assert 'geoinfo' in keys
+
+
+def test_census_dataset_catalog_structure():
+    '''Test that catalog entries have all required fields.'''
+    from eco_stats.api.census_client import DATASET_CATALOG
+
+    required_keys = {
+        'path', 'timeseries', 'name', 'description',
+        'years', 'default_year',
+    }
+    for ds_key, info in DATASET_CATALOG.items():
+        missing = required_keys - set(info.keys())
+        assert not missing, (
+            f'Dataset {ds_key!r} missing keys: {missing}'
+        )
 
 
 def test_fred_client_initialization():
