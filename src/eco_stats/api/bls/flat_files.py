@@ -19,17 +19,31 @@ import os
 import time
 from typing import Any, Dict, List
 
-import requests
+import httpx
 
 from eco_stats.api.bls.programs import get_program
 
-# BLS blocks default Python user agents.  Use a descriptive UA that
-# identifies us as a legitimate library rather than a scraper.
-_USER_AGENT = (
-    'eco-stats/0.1.0 '
-    '(Python; +https://github.com/lowmason/eco-stats) '
-    'requests/{req_version}'
-).format(req_version=requests.__version__)
+# BLS aggressively blocks non-browser user agents.  Mimic a real
+# Chrome browser to avoid 403s on download.bls.gov.
+_HEADERS = {
+    'User-Agent': (
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/131.0.0.0 Safari/537.36'
+    ),
+    'Accept': (
+        'text/html,application/xhtml+xml,application/xml;'
+        'q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8'
+    ),
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+}
 
 
 class BLSFlatFileClient:
@@ -56,8 +70,12 @@ class BLSFlatFileClient:
     ) -> None:
         self.cache_dir = cache_dir
         self.cache_ttl = cache_ttl
-        self.session = requests.Session()
-        self.session.headers['User-Agent'] = _USER_AGENT
+        self.client = httpx.Client(
+            headers=_HEADERS,
+            http2=True,
+            follow_redirects=True,
+            timeout=60.0,
+        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -186,9 +204,9 @@ class BLSFlatFileClient:
         Download a URL and return its text content.
 
         Raises:
-            requests.HTTPError: On non-2xx responses.
+            httpx.HTTPStatusError: On non-2xx responses.
         '''
-        response = self.session.get(url, timeout=60)
+        response = self.client.get(url)
         response.raise_for_status()
         return response.text
 
@@ -212,8 +230,8 @@ class BLSFlatFileClient:
         return rows
 
     def close(self) -> None:
-        '''Close the HTTP session.'''
-        self.session.close()
+        '''Close the HTTP client.'''
+        self.client.close()
 
     def __enter__(self) -> 'BLSFlatFileClient':
         return self
