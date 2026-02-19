@@ -9,6 +9,7 @@ from eco_stats.api.bls import BLSClient
 from eco_stats.api.census_client import CensusClient
 from eco_stats.api.fred_client import FREDClient
 from eco_stats.__main__ import EcoStats
+from eco_stats.vintage import scrape_range, scrape_year
 
 __all__ = [
     'BEAClient',
@@ -16,4 +17,6 @@ __all__ = [
     'CensusClient',
     'FREDClient',
     'EcoStats',
+    'scrape_year',
+    'scrape_range',
 ]

@@ -5,7 +5,7 @@ All data methods return :class:`polars.DataFrame` objects with typed
 columns.  Where applicable a ``date`` column is derived from the BLS
 ``year`` and ``period`` fields.
 
-Three layers of access:
+Four layers of access:
 
 1. **JSON API** — ``get_series()`` and convenience methods hit the
    BLS Public Data API (v1 without key, v2 with key).
@@ -13,6 +13,8 @@ Three layers of access:
    ``search_series()`` expose the LABSTAT metadata.
 3. **Flat files** — ``get_bulk_data()`` downloads complete
    tab-delimited datasets with no rate limits.
+4. **QCEW slices** — ``get_qcew_industry()``, ``get_qcew_area()``,
+   ``get_qcew_size()`` use the CEW open-data CSV API.
 '''
 
 from datetime import date
@@ -22,6 +24,7 @@ import polars as pl
 import requests
 
 from eco_stats.api.bls.flat_files import BLSFlatFileClient
+from eco_stats.api.bls.qcew import QCEWClient
 from eco_stats.api.bls.programs import (
     BLSProgram,
     get_program,
@@ -101,6 +104,7 @@ class BLSClient:
         self.session = requests.Session()
         self.base_url = self.BASE_URL_V2 if api_key else self.BASE_URL_V1
         self._flat = BLSFlatFileClient(cache_dir=cache_dir)
+        self._qcew = QCEWClient(cache_dir=f'{cache_dir}/qcew')
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -504,6 +508,84 @@ class BLSClient:
         return build_series_id(program, **components)
 
     # ------------------------------------------------------------------
+    # QCEW (Quarterly Census of Employment and Wages) — CSV slices
+    # ------------------------------------------------------------------
+
+    def get_qcew_industry(
+        self,
+        industry_code: str = '10',
+        start_year: int = 2016,
+        end_year: int = 2026,
+        quarters: Optional[List[int]] = None,
+    ) -> pl.DataFrame:
+        '''
+        Fetch QCEW data sliced by industry across a year range.
+
+        Uses the CEW open-data CSV API at ``data.bls.gov``.
+
+        Args:
+            industry_code: NAICS or supersector code.  ``'10'`` for
+                total, all industries.  Hyphenated NAICS codes use
+                underscores (e.g., ``'31_33'`` for manufacturing).
+            start_year: First year to fetch (inclusive).
+            end_year: Last year to fetch (inclusive).
+            quarters: Quarters to include (default ``[1, 2, 3, 4]``).
+
+        Returns:
+            :class:`polars.DataFrame` with the QCEW quarterly CSV
+            columns.
+        '''
+        return self._qcew.get_industry(industry_code, start_year, end_year, quarters)
+
+    def get_qcew_area(
+        self,
+        area_code: str = 'US000',
+        start_year: int = 2016,
+        end_year: int = 2026,
+        quarters: Optional[List[int]] = None,
+    ) -> pl.DataFrame:
+        '''
+        Fetch QCEW data sliced by area across a year range.
+
+        Uses the CEW open-data CSV API at ``data.bls.gov``.
+
+        Args:
+            area_code: FIPS-style area code.  ``'US000'`` for national
+                totals; state codes like ``'26000'`` (Michigan).
+            start_year: First year to fetch (inclusive).
+            end_year: Last year to fetch (inclusive).
+            quarters: Quarters to include (default ``[1, 2, 3, 4]``).
+
+        Returns:
+            :class:`polars.DataFrame` with the QCEW quarterly CSV
+            columns.
+        '''
+        return self._qcew.get_area(area_code, start_year, end_year, quarters)
+
+    def get_qcew_size(
+        self,
+        size_code: str = '1',
+        start_year: int = 2016,
+        end_year: int = 2026,
+    ) -> pl.DataFrame:
+        '''
+        Fetch QCEW data sliced by establishment-size class.
+
+        Size data is only published for Q1 of each year and excludes
+        size code 0 (all sizes).
+
+        Args:
+            size_code: Size class code (``'1'``–``'9'``).
+            start_year: First year to fetch (inclusive).
+            end_year: Last year to fetch (inclusive).
+
+        Returns:
+            :class:`polars.DataFrame` with the QCEW quarterly CSV
+            columns.
+        '''
+        return self._qcew.get_size(size_code, start_year, end_year)
+
+    # ------------------------------------------------------------------
     # Flat file / bulk data access
     # ------------------------------------------------------------------
 
@@ -515,20 +597,30 @@ class BLSClient:
         '''
         Download a complete data file from BLS flat files.
 
-        These files contain full historical data with no API rate
-        limits.  Files are cached locally.
+        For the QCEW program (``'EN'``), this automatically uses the
+        CEW open-data CSV API instead of the LABSTAT flat files (which
+        are frequently blocked).  Use :meth:`get_qcew_industry`,
+        :meth:`get_qcew_area`, or :meth:`get_qcew_size` for more
+        control over QCEW queries.
 
         Args:
             program: Two-letter program prefix (e.g., ``"CE"``).
             file_suffix: Portion after ``xx.data.`` in the filename.
                 Common suffixes include ``"0.Current"`` and
-                ``"0.AllCESSeries"`` (for CE).
+                ``"0.AllCESSeries"`` (for CE).  Ignored when
+                *program* is ``"EN"``.
 
         Returns:
-            :class:`polars.DataFrame` with columns ``series_id``,
-            ``date``, ``year``, ``period``, ``value``,
-            ``footnote_codes``.
+            :class:`polars.DataFrame`.  For most programs this has
+            columns ``series_id``, ``date``, ``year``, ``period``,
+            ``value``, ``footnote_codes``.  For ``EN`` (QCEW) the
+            native CSV columns are returned instead (``area_fips``,
+            ``own_code``, ``industry_code``, ``year``, ``qtr``,
+            employment levels, wages, etc.).
         '''
+        if program.upper() == 'EN':
+            return self.get_qcew_industry()
+
         rows = self._flat.get_data(program, file_suffix)
         if not rows:
             return pl.DataFrame()
@@ -561,6 +653,7 @@ class BLSClient:
         '''Close HTTP sessions.'''
         self.session.close()
         self._flat.close()
+        self._qcew.close()
 
     def __enter__(self) -> 'BLSClient':
         '''Context manager entry.'''

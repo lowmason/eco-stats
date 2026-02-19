@@ -109,6 +109,19 @@ with FREDClient(api_key="your_fred_api_key") as fred:
     # Session automatically closed
 ```
 
+### BLS Vintage Release Dates
+
+```python
+from eco_stats.vintage import scrape_range, scrape_year
+
+# Scrape one schedule year
+rows_2025 = scrape_year(2025)
+
+# Scrape a range into a Polars DataFrame
+df = scrape_range(start_year=2016, end_year=2026, delay=1.0)
+print(df.head())
+```
+
 ## API Client Examples
 
 ### BEA (Bureau of Economic Analysis)
@@ -255,6 +268,12 @@ Run the application from the command line:
 
 ```bash
 eco-stats
+```
+
+Run the vintage schedule scraper:
+
+```bash
+eco-stats-vintage
 ```
 
 Or using Python:
