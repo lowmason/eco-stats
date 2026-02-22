@@ -17,11 +17,15 @@ Four layers of access:
    ``get_qcew_size()`` use the CEW open-data CSV API.
 '''
 
+import logging
+import time
 from datetime import date
 from typing import Any, Dict, List, Optional
 
 import polars as pl
 import requests
+
+logger = logging.getLogger(__name__)
 
 from eco_stats.api.bls.flat_files import BLSFlatFileClient
 from eco_stats.api.bls.qcew import QCEWClient
@@ -221,6 +225,10 @@ class BLSClient:
     # JSON API access
     # ------------------------------------------------------------------
 
+    # BLS API limits: 50 series/request with key, 25 without.
+    _CHUNK_SIZE_V2 = 50
+    _CHUNK_SIZE_V1 = 25
+
     def get_series(
         self,
         series_ids: List[str],
@@ -233,6 +241,9 @@ class BLSClient:
     ) -> pl.DataFrame:
         '''
         Get time series data via the BLS Public Data API.
+
+        Automatically chunks large requests to stay within BLS per-request
+        limits (50 series with an API key, 25 without).
 
         Args:
             series_ids: List of BLS series IDs
@@ -247,6 +258,74 @@ class BLSClient:
         Returns:
             :class:`polars.DataFrame` with columns ``series_id``,
             ``date``, ``year``, ``period``, ``period_name``, ``value``.
+        '''
+        chunk_size = self._CHUNK_SIZE_V2 if self.api_key else self._CHUNK_SIZE_V1
+        chunks = [
+            series_ids[i : i + chunk_size]
+            for i in range(0, len(series_ids), chunk_size)
+        ]
+        total_chunks = len(chunks)
+
+        if total_chunks > 1:
+            logger.info(
+                'Splitting %d series into %d requests of up to %d each',
+                len(series_ids),
+                total_chunks,
+                chunk_size,
+            )
+
+        frames: List[pl.DataFrame] = []
+        for idx, chunk in enumerate(chunks):
+            if total_chunks > 1:
+                logger.info(
+                    'Request %d/%d  (%d series)',
+                    idx + 1,
+                    total_chunks,
+                    len(chunk),
+                )
+
+            df = self._fetch_series_chunk(
+                chunk,
+                start_year=start_year,
+                end_year=end_year,
+                catalog=catalog,
+                calculations=calculations,
+                annual_average=annual_average,
+                aspects=aspects,
+            )
+            frames.append(df)
+
+            if idx < total_chunks - 1:
+                time.sleep(0.5)
+
+        if not frames:
+            return pl.DataFrame(
+                schema={
+                    'series_id': pl.Utf8,
+                    'date': pl.Date,
+                    'year': pl.Int64,
+                    'period': pl.Utf8,
+                    'period_name': pl.Utf8,
+                    'value': pl.Float64,
+                }
+            )
+        return pl.concat(frames).sort('series_id', 'date')
+
+    def _fetch_series_chunk(
+        self,
+        series_ids: List[str],
+        start_year: Optional[str] = None,
+        end_year: Optional[str] = None,
+        catalog: bool = False,
+        calculations: bool = False,
+        annual_average: bool = False,
+        aspects: bool = False,
+    ) -> pl.DataFrame:
+        '''
+        Fetch a single chunk of series from the BLS API.
+
+        This is the low-level method that ``get_series`` delegates to
+        for each batch.  Callers should use ``get_series`` instead.
         '''
         payload: Dict[str, Any] = {'seriesid': series_ids}
 
